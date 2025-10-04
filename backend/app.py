@@ -12,6 +12,7 @@ from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 from openai import OpenAI
+from tinydb import TinyDB, Query
 
 # Import our scraping and analysis modules
 from scripts.discover_flyers import discover_latest_flyers, save_flyer_urls
@@ -28,11 +29,17 @@ CORS(app)
 # Configuration
 PROMOTIONS_DIR = "data/promotion_results"
 FLYER_IMAGES_DIR = "data/flyer_images"
+DB_PATH = "data/promotions.json"
 NUM_PAGES_PER_STORE = 2
 EXCLUDE_STORES = ['super-c-direct']  # Old test folder
 
 # Initialize OpenAI client
 openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+
+# Initialize TinyDB
+db = TinyDB(DB_PATH)
+promotions_table = db.table('promotions')
+scrapes_table = db.table('scrapes')
 
 # In-memory storage for generated recipes
 recipes_cache = {}
@@ -77,6 +84,12 @@ def run_weekly_scrape_and_analysis():
         total_promotions = sum(r['promotion_count'] for r in results.values())
         print(f"✓ Extracted {total_promotions} promotions from {len(results)} stores")
 
+        # Step 5: Save to database
+        print("\n[5/5] Saving promotions to database...")
+        promotions = load_all_promotions_from_files()
+        save_promotions_to_db(promotions)
+        print(f"✓ Saved {len(promotions)} promotions to database")
+
         print("\n" + "="*60)
         print(f"[{datetime.now()}] Weekly task completed successfully!")
         print("="*60 + "\n")
@@ -86,7 +99,7 @@ def run_weekly_scrape_and_analysis():
         print("="*60 + "\n")
 
 
-def load_all_promotions():
+def load_all_promotions_from_files():
     """Load all promotions from the promotion_results directory."""
     promotions = []
 
@@ -105,6 +118,57 @@ def load_all_promotions():
     return promotions
 
 
+def save_promotions_to_db(promotions):
+    """
+    Save promotions to TinyDB with a timestamp.
+    Each scrape is stored as a separate record with all promotions.
+    """
+    scrape_id = datetime.now().isoformat()
+
+    # Clear old promotions
+    promotions_table.truncate()
+
+    # Insert new promotions with scrape_id
+    for promo in promotions:
+        promo_with_id = promo.copy()
+        promo_with_id['scrape_id'] = scrape_id
+        promotions_table.insert(promo_with_id)
+
+    # Record the scrape metadata
+    scrapes_table.insert({
+        'scrape_id': scrape_id,
+        'timestamp': scrape_id,
+        'promotion_count': len(promotions)
+    })
+
+
+def load_all_promotions():
+    """
+    Load the latest promotions from TinyDB.
+    Returns promotions from the most recent scrape only.
+    """
+    # Get the latest scrape
+    all_scrapes = scrapes_table.all()
+
+    if not all_scrapes:
+        # Fallback to file-based loading if no database records
+        return load_all_promotions_from_files()
+
+    # Find the most recent scrape
+    latest_scrape = max(all_scrapes, key=lambda x: x['timestamp'])
+    scrape_id = latest_scrape['scrape_id']
+
+    # Get all promotions from that scrape
+    Promo = Query()
+    promotions = promotions_table.search(Promo.scrape_id == scrape_id)
+
+    # Remove scrape_id from the output
+    return [
+        {k: v for k, v in promo.items() if k not in ['scrape_id', 'doc_id']}
+        for promo in promotions
+    ]
+
+
 def generate_recipes_with_openai(promotions, num_recipes=5, preferences=None):
     """Generate recipes using OpenAI based on current promotions."""
     global recipe_counter
@@ -112,58 +176,77 @@ def generate_recipes_with_openai(promotions, num_recipes=5, preferences=None):
     if preferences is None:
         preferences = {}
 
-    # Format promotions for prompt
-    promotion_list = "\n".join([
-        f"- {p['item']}: ${p['price']}/{p['unit']} ({p['discount']}) at {p['store']}"
-        for p in promotions[:30]  # Limit to first 30 to keep prompt manageable
-    ])
+    # Extract just item names and filter out obvious non-food items
+    non_food_keywords = [
+        'detergent', 'bleach', 'cleaner', 'soap', 'shampoo', 'conditioner',
+        'toothpaste', 'deodorant', 'tissue', 'paper towel', 'toilet paper',
+        'diaper', 'wipes', 'laundry', 'dish soap', 'fabric softener'
+    ]
+
+    promo_items = [
+        p['item'] for p in promotions
+        if not any(keyword in p['item'].lower() for keyword in non_food_keywords)
+    ]
+
+    # Format promotions as a simple list for the prompt
+    promotion_list = ", ".join(promo_items)
 
     # Build prompt
     dietary = preferences.get('dietary', '')
     servings = preferences.get('servings', 4)
 
-    dietary_text = f"Make the recipes {dietary}." if dietary else ""
+    dietary_text = f"\n- All recipes must be {dietary}" if dietary else ""
 
-    prompt = f"""You are a meal planning assistant. Generate {num_recipes} recipes using primarily the following promoted grocery items:
+    prompt = f"""You are a creative meal planning assistant. Generate {num_recipes} VARIED and DIFFERENT recipes that primarily use items from the following grocery promotions:
 
-Current Promotions:
+**Promoted Food Items (all suitable for cooking):**
 {promotion_list}
 
-Requirements:
-- Use as many promoted items as possible to maximize savings
-- Create complete, balanced meals
-- Each recipe should serve {servings} people
-- Include cooking time
-{dietary_text}
-- Return ONLY valid JSON
+**Instructions:**
+1. Create {num_recipes} diverse recipes with different cuisines, cooking methods, and main ingredients
+2. Each recipe should use MULTIPLE items from the promotion list above (aim for 3-5+ promoted items per recipe)
+3. You may include common pantry staples (salt, pepper, oil, flour, spices, etc.) that aren't on the promotion list
+4. Focus on creating complete, balanced, delicious meals that maximize savings from the promoted items
+5. Each recipe should serve {servings} people{dietary_text}
+6. DO NOT make up or invent promoted items - ONLY use items from the list above
 
-Output format (array of recipe objects):
+**Quality Standards:**
+- Make recipes practical and achievable for home cooks
+- Provide clear, step-by-step instructions (4-6 steps)
+- Include realistic cooking times
+- Ensure variety across all {num_recipes} recipes (different proteins, vegetables, cooking styles)
+
+**Output Format (ONLY valid JSON):**
 [
   {{
     "name": "Recipe Name",
-    "description": "Brief description of the dish",
+    "description": "Brief appetizing description of the dish",
     "ingredients": [
       {{"item": "Chicken breast", "amount": "1.5 lb", "on_sale": true}},
-      {{"item": "Salt", "amount": "1 tsp", "on_sale": false}}
+      {{"item": "Garlic", "amount": "3 cloves", "on_sale": true}},
+      {{"item": "Olive oil", "amount": "2 tbsp", "on_sale": false}}
     ],
-    "instructions": ["Step 1", "Step 2", "Step 3"],
+    "instructions": ["Step 1", "Step 2", "Step 3", "Step 4"],
     "cooking_time": "30 mins",
     "servings": {servings}
   }}
 ]
 
-Important: Mark "on_sale": true for ingredients that are in the promotions list, false otherwise.
+**Critical Rules:**
+- Mark "on_sale": true ONLY for ingredients that EXACTLY match items in the promoted list above
+- Mark "on_sale": false for pantry staples or items NOT in the promoted list
+- Do NOT include any non-food items in recipes
 """
 
     try:
         response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful meal planning assistant that creates recipes based on grocery promotions."},
+                {"role": "system", "content": "You are a creative meal planning assistant that creates diverse, delicious recipes based on grocery promotions to help users save money while eating well."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=3000,
-            temperature=0.7
+            max_tokens=4000,
+            temperature=0.8
         )
 
         content = response.choices[0].message.content.strip()
@@ -210,13 +293,21 @@ def health_check():
 
 @app.route('/api/promotions', methods=['GET'])
 def get_promotions():
-    """Get all current promotions."""
+    """Get all current promotions (from latest scrape only)."""
     try:
         promotions = load_all_promotions()
+
+        # Get the latest scrape timestamp
+        all_scrapes = scrapes_table.all()
+        scrape_timestamp = None
+        if all_scrapes:
+            latest_scrape = max(all_scrapes, key=lambda x: x['timestamp'])
+            scrape_timestamp = latest_scrape['timestamp']
 
         return jsonify({
             "promotions": promotions,
             "count": len(promotions),
+            "scrape_timestamp": scrape_timestamp,
             "last_updated": datetime.now().isoformat()
         })
 
