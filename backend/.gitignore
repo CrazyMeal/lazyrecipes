@@ -28,9 +28,11 @@ ENV/
 htmlcov/
 .tox/
 
-# Temporary Data
-flyer_images/
-promotion_results/
+# Data directories
+data/
+deprecated/
+
+# Temporary files (in deprecated/)
 test_promotions_*.json
 discovered_flyers.json
 flyer_image_urls.json

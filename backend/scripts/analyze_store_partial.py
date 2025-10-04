@@ -5,7 +5,7 @@ Usage: python analyze_store_partial.py <store_name> <num_pages>
 
 import sys
 import json
-from analyze_flyers import analyze_flyer_image
+from scripts.analyze_flyers import analyze_flyer_image
 from openai import OpenAI
 import os
 from dotenv import load_dotenv

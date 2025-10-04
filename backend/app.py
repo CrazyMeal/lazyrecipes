@@ -14,10 +14,10 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 # Import our scraping and analysis modules
-from discover_flyers import discover_latest_flyers, save_flyer_urls
-from extract_flyer_urls import extract_all_flyers, save_image_urls
-from download_all_flyers import download_all_flyers
-from analyze_all_stores_partial import analyze_all_stores_partial
+from scripts.discover_flyers import discover_latest_flyers, save_flyer_urls
+from scripts.extract_flyer_urls import extract_all_flyers, save_image_urls
+from scripts.download_all_flyers import download_all_flyers
+from scripts.analyze_all_stores_partial import analyze_all_stores_partial
 
 # Load environment variables
 load_dotenv()
@@ -26,8 +26,8 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuration
-PROMOTIONS_DIR = "promotion_results"
-FLYER_IMAGES_DIR = "flyer_images"
+PROMOTIONS_DIR = "data/promotion_results"
+FLYER_IMAGES_DIR = "data/flyer_images"
 NUM_PAGES_PER_STORE = 2
 EXCLUDE_STORES = ['super-c-direct']  # Old test folder
 

@@ -10,9 +10,9 @@ import sys
 import os
 
 # Import our scraping modules
-from discover_flyers import discover_latest_flyers, save_flyer_urls
-from extract_flyer_urls import extract_all_flyers, save_image_urls
-from download_all_flyers import download_all_flyers
+from scripts.discover_flyers import discover_latest_flyers, save_flyer_urls
+from scripts.extract_flyer_urls import extract_all_flyers, save_image_urls
+from scripts.download_all_flyers import download_all_flyers
 
 def main():
     """Run the complete flyer scraping pipeline."""

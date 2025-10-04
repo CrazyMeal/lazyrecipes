@@ -5,7 +5,7 @@ Saves results to organized folder structure.
 
 import os
 import json
-from analyze_flyers import analyze_flyer_image
+from scripts.analyze_flyers import analyze_flyer_image
 from openai import OpenAI
 from dotenv import load_dotenv
 
