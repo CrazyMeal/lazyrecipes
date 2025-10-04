@@ -31,6 +31,9 @@ export default function Recipes() {
     const recipeIds = Array.from(selectedRecipes);
     const shoppingListData = await shoppingListMutation.mutateAsync(recipeIds);
 
+    // Clear any existing shopping list from sessionStorage before navigating
+    sessionStorage.removeItem('lazyrecipes-current-shopping-list');
+
     // Navigate to shopping list page with data
     navigate('/shopping-list', {
       state: { shoppingList: shoppingListData }

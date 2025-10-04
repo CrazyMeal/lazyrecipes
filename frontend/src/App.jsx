@@ -19,22 +19,22 @@ const queryClient = new QueryClient({
 
 // Create persister with 10 minute TTL
 const persister = createSyncStoragePersister({
-  storage: window.localStorage,
+  storage: window.sessionStorage,
   key: 'lazyrecipes-cache',
   throttleTime: 1000,
 });
 
 // Clear cache older than 10 minutes on app load
 const MAX_CACHE_AGE = 10 * 60 * 1000; // 10 minutes
-const cacheTimestamp = localStorage.getItem('lazyrecipes-cache-timestamp');
+const cacheTimestamp = sessionStorage.getItem('lazyrecipes-cache-timestamp');
 if (cacheTimestamp) {
   const age = Date.now() - parseInt(cacheTimestamp, 10);
   if (age > MAX_CACHE_AGE) {
-    localStorage.removeItem('lazyrecipes-cache');
-    localStorage.removeItem('lazyrecipes-cache-timestamp');
+    sessionStorage.removeItem('lazyrecipes-cache');
+    sessionStorage.removeItem('lazyrecipes-cache-timestamp');
   }
 } else {
-  localStorage.setItem('lazyrecipes-cache-timestamp', Date.now().toString());
+  sessionStorage.setItem('lazyrecipes-cache-timestamp', Date.now().toString());
 }
 
 function App() {
