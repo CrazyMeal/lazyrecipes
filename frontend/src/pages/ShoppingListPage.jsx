@@ -10,9 +10,18 @@ export default function ShoppingListPage() {
   // Generate a unique key for this shopping list session
   const shoppingListKey = 'lazyrecipes-current-shopping-list';
 
-  // Initialize state from sessionStorage or location state
+  // Initialize state from location state or sessionStorage
   const getInitialState = () => {
-    // Try to load from sessionStorage first
+    // Prioritize fresh navigation state over cached sessionStorage
+    if (shoppingListData?.shopping_list) {
+      return {
+        shopping_list: shoppingListData.shopping_list,
+        total_cost: shoppingListData.total_cost || 0,
+        estimated_savings: shoppingListData.estimated_savings || 0
+      };
+    }
+
+    // Fallback to sessionStorage for page refreshes
     const saved = sessionStorage.getItem(shoppingListKey);
     if (saved) {
       try {
@@ -21,11 +30,12 @@ export default function ShoppingListPage() {
         console.error('Failed to parse saved shopping list', e);
       }
     }
-    // Fallback to location state
+
+    // Final fallback to empty state
     return {
-      shopping_list: shoppingListData?.shopping_list || [],
-      total_cost: shoppingListData?.total_cost || 0,
-      estimated_savings: shoppingListData?.estimated_savings || 0
+      shopping_list: [],
+      total_cost: 0,
+      estimated_savings: 0
     };
   };
 
