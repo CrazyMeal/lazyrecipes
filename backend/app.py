@@ -388,12 +388,14 @@ def generate_recipes():
 @app.route('/api/shopping-list', methods=['POST'])
 def create_shopping_list():
     """
-    Create a shopping list from selected recipes.
+    Create a promotion-centric shopping list from selected recipes.
 
     Request body:
     {
       "recipe_ids": ["recipe_1", "recipe_3"]
     }
+
+    Returns a list of actual promotional items to buy, not aggregated ingredients.
     """
     try:
         data = request.get_json()
@@ -414,52 +416,145 @@ def create_shopping_list():
                     "error": f"Recipe {recipe_id} not found. Generate recipes first."
                 }), 404
 
-        # Aggregate ingredients
-        ingredient_map = {}
+        # Load promotions
+        promotions = load_all_promotions()
 
+        # Build a map to track which promotions are used and by how many recipes
+        promotion_usage = {}  # promotion_item_lower -> {promo, recipe_names, suggested_amounts}
+
+        # Track non-promotional ingredients separately
+        other_ingredients = {}  # item_lower -> {amounts, on_sale}
+
+        # Process each recipe
         for recipe in selected_recipes:
+            recipe_name = recipe['name']
+
             for ingredient in recipe['ingredients']:
                 item_name = ingredient['item']
+                item_lower = item_name.lower()
+                amount = ingredient['amount']
+                on_sale = ingredient.get('on_sale', False)
 
-                if item_name in ingredient_map:
-                    # For simplicity, just append amounts (proper aggregation would parse units)
-                    ingredient_map[item_name]['amount'] += f" + {ingredient['amount']}"
+                # Try to match to a promotion if marked as on_sale
+                if on_sale:
+                    matching_promo = None
+
+                    # Find matching promotion with fuzzy matching
+                    for promo in promotions:
+                        promo_item_lower = promo['item'].lower()
+
+                        # Check if ingredient name contains promo name or vice versa
+                        # or if key words match (e.g., "chicken" in both)
+                        if (promo_item_lower in item_lower or
+                            item_lower in promo_item_lower or
+                            any(word in promo_item_lower for word in item_lower.split() if len(word) > 4)):
+                            matching_promo = promo
+                            break
+
+                    if matching_promo:
+                        promo_key = matching_promo['item'].lower()
+
+                        if promo_key not in promotion_usage:
+                            promotion_usage[promo_key] = {
+                                'promo': matching_promo,
+                                'recipe_names': [],
+                                'suggested_amounts': []
+                            }
+
+                        promotion_usage[promo_key]['recipe_names'].append(recipe_name)
+                        promotion_usage[promo_key]['suggested_amounts'].append(amount)
+                    else:
+                        # Marked as on_sale but no matching promotion found - treat as other ingredient
+                        if item_lower not in other_ingredients:
+                            other_ingredients[item_lower] = {
+                                'item': item_name,
+                                'amounts': [],
+                                'on_sale': False
+                            }
+                        other_ingredients[item_lower]['amounts'].append(amount)
                 else:
-                    ingredient_map[item_name] = {
-                        'item': item_name,
-                        'amount': ingredient['amount'],
-                        'on_sale': ingredient.get('on_sale', False)
-                    }
+                    # Not on sale - add to other ingredients
+                    if item_lower not in other_ingredients:
+                        other_ingredients[item_lower] = {
+                            'item': item_name,
+                            'amounts': [],
+                            'on_sale': False
+                        }
+                    other_ingredients[item_lower]['amounts'].append(amount)
 
-        shopping_list = list(ingredient_map.values())
-
-        # Load promotions to add price info
-        promotions = load_all_promotions()
-        promotion_map = {p['item'].lower(): p for p in promotions}
-
+        # Build the shopping list with promotional items
+        shopping_list = []
         total_cost = 0.0
         estimated_savings = 0.0
+        item_counter = 1
 
-        for item in shopping_list:
-            item_lower = item['item'].lower()
+        # Add promotional items
+        for promo_key, usage_data in promotion_usage.items():
+            promo = usage_data['promo']
+            recipe_count = len(usage_data['recipe_names'])
+            suggested_amounts = usage_data['suggested_amounts']
 
-            # Try to find matching promotion
-            matching_promo = None
-            for promo_key, promo in promotion_map.items():
-                if promo_key in item_lower or item_lower in promo_key:
-                    matching_promo = promo
-                    break
+            # Calculate unit price
+            price_per_unit = promo['price']
+            original_price = None
 
-            if matching_promo:
-                item['price'] = matching_promo['price']
-                item['on_sale'] = True
-                total_cost += matching_promo['price']
-                # Estimate 30% savings on sale items
-                estimated_savings += matching_promo['price'] * 0.3
+            # Try to extract discount amount to calculate original price
+            if promo.get('discount'):
+                discount_text = promo['discount']
+                # Parse discount like "Save $8"
+                if 'Save $' in discount_text or 'Save$' in discount_text:
+                    try:
+                        saved_amount = float(discount_text.replace('Save', '').replace('$', '').strip())
+                        original_price = price_per_unit + saved_amount
+                        estimated_savings += saved_amount
+                    except:
+                        # Estimate 30% savings if we can't parse
+                        original_price = price_per_unit / 0.7
+                        estimated_savings += price_per_unit * 0.3
+                else:
+                    # Estimate 30% savings
+                    original_price = price_per_unit / 0.7
+                    estimated_savings += price_per_unit * 0.3
             else:
-                # Estimate price for non-sale items
-                item['price'] = 5.0  # Placeholder
-                total_cost += 5.0
+                # Estimate 30% savings if no discount info
+                original_price = price_per_unit / 0.7
+                estimated_savings += price_per_unit * 0.3
+
+            shopping_list.append({
+                'id': f'promo_{item_counter}',
+                'item': promo['item'],
+                'is_promotion': True,
+                'price': price_per_unit,
+                'price_per_unit': price_per_unit,
+                'original_price': original_price,
+                'unit': promo.get('unit', 'each'),
+                'store': promo.get('store', 'Unknown'),
+                'discount': promo.get('discount', ''),
+                'on_sale': True,
+                'recipes_using': recipe_count,
+                'recipe_names': usage_data['recipe_names'],
+                'amount': ', '.join(suggested_amounts)  # Show suggested amounts from recipes
+            })
+
+            total_cost += price_per_unit
+            item_counter += 1
+
+        # Add other (non-promotional) ingredients
+        for item_lower, item_data in other_ingredients.items():
+            amounts = item_data['amounts']
+            combined_amount = ', '.join(amounts)
+
+            shopping_list.append({
+                'id': f'item_{item_counter}',
+                'item': item_data['item'],
+                'is_promotion': False,
+                'amount': combined_amount,
+                'on_sale': False,
+                'price': None,  # No price for non-promotional items
+                'recipes_using': len(amounts)
+            })
+
+            item_counter += 1
 
         return jsonify({
             "shopping_list": shopping_list,
