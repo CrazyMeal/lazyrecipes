@@ -5,8 +5,8 @@ export function useGetRecipes(numRecipes = 5, preferences = {}) {
   return useQuery({
     queryKey: ['recipes', numRecipes, preferences],
     queryFn: () => api.getRecipes(numRecipes, preferences),
-    staleTime: 5 * 60 * 1000, // 5 minutes - recipes considered fresh
-    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache (matches global TTL)
+    staleTime: 0, // Always fetch fresh data from backend
+    gcTime: 0, // Don't cache
     retry: 1,
   });
 }
