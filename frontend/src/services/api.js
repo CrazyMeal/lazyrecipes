@@ -52,10 +52,12 @@ export const api = {
       await delay(150); // Minimal delay for smooth UI transitions
       return mockRecipes;
     }
-    // Backend will handle promotion scraping internally
-    return fetchAPI('/api/recipes', {
-      method: 'GET',
-      // Query params for customization
+    return fetchAPI('/api/recipes/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        num_recipes: numRecipes,
+        preferences: preferences,
+      }),
     });
   },
 
