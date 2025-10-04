@@ -49,7 +49,7 @@ async function fetchAPI(endpoint, options = {}) {
 export const api = {
   async scrapePromotions(store = 'metro') {
     if (USE_MOCK_DATA) {
-      await delay(1500); // Simulate network delay
+      await delay(100); // Minimal delay for smooth UI transitions
       return mockPromotions;
     }
     return fetchAPI('/api/scrape', {
@@ -60,7 +60,7 @@ export const api = {
 
   async generateRecipes(promotions, numRecipes = 5, preferences = {}) {
     if (USE_MOCK_DATA) {
-      await delay(2000); // Simulate AI generation delay
+      await delay(150); // Minimal delay for smooth UI transitions
       return mockRecipes;
     }
     return fetchAPI('/api/recipes/generate', {
@@ -75,7 +75,7 @@ export const api = {
 
   async createShoppingList(recipeIds) {
     if (USE_MOCK_DATA) {
-      await delay(800); // Simulate processing delay
+      await delay(100); // Minimal delay for smooth UI transitions
       return mockShoppingList(recipeIds);
     }
     return fetchAPI('/api/shopping-list', {

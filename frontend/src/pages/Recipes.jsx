@@ -1,38 +1,27 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import RecipeCard from '../components/RecipeCard';
-import ShoppingList from '../components/ShoppingList';
 import { useScrapePromotions } from '../hooks/usePromotions';
 import { useGenerateRecipes } from '../hooks/useRecipes';
 import { useCreateShoppingList } from '../hooks/useShoppingList';
 
 export default function Recipes() {
   const navigate = useNavigate();
-  const [step, setStep] = useState('initial');
+  const location = useLocation();
   const [selectedRecipes, setSelectedRecipes] = useState(new Set());
 
-  const scrapeMutation = useScrapePromotions();
-  const generateMutation = useGenerateRecipes();
+  // Use query-based hooks with automatic caching
+  const promotionsQuery = useScrapePromotions('metro');
+  const recipesQuery = useGenerateRecipes(promotionsQuery.data?.promotions, 5);
   const shoppingListMutation = useCreateShoppingList();
 
+  // Reset queries if resetFlow is requested
   useEffect(() => {
-    startScraping();
-  }, []);
-
-  async function startScraping() {
-    setStep('promotions');
-
-    try {
-      const scrapeData = await scrapeMutation.mutateAsync('metro');
-      const recipesData = await generateMutation.mutateAsync({
-        promotions: scrapeData.promotions,
-        numRecipes: 5,
-      });
-      setStep('recipes');
-    } catch (err) {
-      setStep('initial');
+    if (location.state?.resetFlow) {
+      promotionsQuery.refetch();
+      setSelectedRecipes(new Set());
     }
-  }
+  }, [location.state?.resetFlow]);
 
   async function createShoppingList() {
     if (selectedRecipes.size === 0) {
@@ -40,8 +29,12 @@ export default function Recipes() {
     }
 
     const recipeIds = Array.from(selectedRecipes);
-    await shoppingListMutation.mutateAsync(recipeIds);
-    setStep('shopping-list');
+    const shoppingListData = await shoppingListMutation.mutateAsync(recipeIds);
+
+    // Navigate to shopping list page with data
+    navigate('/shopping-list', {
+      state: { shoppingList: shoppingListData }
+    });
   }
 
   function toggleRecipeSelection(recipeId) {
@@ -57,21 +50,19 @@ export default function Recipes() {
   }
 
   function resetFlow() {
-    setStep('initial');
     setSelectedRecipes(new Set());
-    scrapeMutation.reset();
-    generateMutation.reset();
-    shoppingListMutation.reset();
-    startScraping();
+    promotionsQuery.refetch();
   }
 
-  const isLoading = scrapeMutation.isPending || generateMutation.isPending || shoppingListMutation.isPending;
-  const error = scrapeMutation.error || generateMutation.error || shoppingListMutation.error;
+  const isLoading = promotionsQuery.isLoading || recipesQuery.isLoading || shoppingListMutation.isPending;
+  const error = promotionsQuery.error || recipesQuery.error || shoppingListMutation.error;
 
-  const promotions = scrapeMutation.data?.promotions || [];
-  const store = scrapeMutation.data?.store || 'Metro';
-  const recipes = generateMutation.data?.recipes || [];
-  const shoppingList = shoppingListMutation.data;
+  const promotions = promotionsQuery.data?.promotions || [];
+  const store = promotionsQuery.data?.store || 'Metro';
+  const recipes = recipesQuery.data?.recipes || [];
+
+  // Determine if we should show recipes (both queries succeeded)
+  const showRecipes = !isLoading && !error && recipes.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -83,7 +74,7 @@ export default function Recipes() {
           >
             LazyRecipes
           </button>
-          {step !== 'initial' && (
+          {showRecipes && (
             <button onClick={resetFlow} className="btn-secondary">
               Start Over
             </button>
@@ -105,14 +96,14 @@ export default function Recipes() {
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary-600 mb-4"></div>
             <p className="text-lg text-gray-600">
-              {scrapeMutation.isPending && 'Scanning grocery stores for promotions...'}
-              {generateMutation.isPending && 'Generating delicious recipes...'}
+              {promotionsQuery.isLoading && 'Scanning grocery stores for promotions...'}
+              {recipesQuery.isLoading && 'Generating delicious recipes...'}
               {shoppingListMutation.isPending && 'Creating your shopping list...'}
             </p>
           </div>
         )}
 
-        {!isLoading && step === 'recipes' && (
+        {showRecipes && (
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-6">
               Recipe Suggestions
@@ -193,31 +184,6 @@ export default function Recipes() {
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {!isLoading && step === 'shopping-list' && shoppingList && (
-          <div className="max-w-2xl mx-auto">
-            <ShoppingList
-              shoppingList={shoppingList.shopping_list}
-              totalCost={shoppingList.total_cost}
-              estimatedSavings={shoppingList.estimated_savings}
-            />
-
-            <div className="mt-6 flex gap-4">
-              <button
-                onClick={() => setStep('recipes')}
-                className="btn-secondary flex-1"
-              >
-                Back to Recipes
-              </button>
-              <button
-                onClick={resetFlow}
-                className="btn-primary flex-1"
-              >
-                Start New Search
-              </button>
             </div>
           </div>
         )}
