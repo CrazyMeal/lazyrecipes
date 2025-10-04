@@ -1,0 +1,372 @@
+openapi: 3.0.3
+info:
+  title: LazyRecipes API
+  description: Backend API for the LazyRecipes hackathon PoC - generates recipes from grocery store promotions
+  version: 1.0.0
+  contact:
+    name: LazyRecipes Team
+
+servers:
+  - url: http://localhost:5000
+    description: Development server
+
+paths:
+  /api/scrape:
+    post:
+      summary: Scrape grocery store promotions
+      description: Triggers Playwright scraper to fetch current store promotions from specified grocery stores
+      operationId: scrapePromotions
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                store:
+                  type: string
+                  enum: [metro, walmart, loblaws, flipp]
+                  description: Target store to scrape (optional, defaults to metro)
+              example:
+                store: metro
+      responses:
+        '200':
+          description: Successfully scraped promotions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  promotions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Promotion'
+                  store:
+                    type: string
+                  scraped_at:
+                    type: string
+                    format: date-time
+              example:
+                promotions:
+                  - item: "Chicken breast"
+                    price: 4.99
+                    unit: "lb"
+                    store: "Metro"
+                    discount: "30% off"
+                  - item: "Honey"
+                    price: 3.49
+                    unit: "375ml"
+                    store: "Metro"
+                    discount: "Save $1.50"
+                store: "metro"
+                scraped_at: "2025-10-04T14:30:00Z"
+        '500':
+          description: Scraping failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/recipes/generate:
+    post:
+      summary: Generate recipes from promotions
+      description: Takes promotion data and generates recipes using OpenAI API
+      operationId: generateRecipes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - promotions
+              properties:
+                promotions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Promotion'
+                num_recipes:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 5
+                  description: Number of recipes to generate
+                preferences:
+                  type: object
+                  properties:
+                    dietary:
+                      type: string
+                      enum: [vegetarian, vegan, gluten_free, dairy_free, none]
+                      description: Dietary restrictions
+                    servings:
+                      type: integer
+                      minimum: 1
+                      maximum: 12
+                      default: 4
+                      description: Number of servings per recipe
+                    cuisine:
+                      type: string
+                      description: Preferred cuisine style (optional)
+              example:
+                promotions:
+                  - item: "Chicken breast"
+                    price: 4.99
+                    unit: "lb"
+                    store: "Metro"
+                    discount: "30% off"
+                num_recipes: 3
+                preferences:
+                  dietary: "none"
+                  servings: 4
+      responses:
+        '200':
+          description: Successfully generated recipes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recipes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Recipe'
+                  generated_at:
+                    type: string
+                    format: date-time
+              example:
+                recipes:
+                  - id: "recipe_1"
+                    name: "Honey Garlic Chicken"
+                    description: "Quick weeknight dinner with tender chicken in sweet garlic sauce"
+                    ingredients:
+                      - item: "Chicken breast"
+                        amount: "1.5 lb"
+                        on_sale: true
+                      - item: "Honey"
+                        amount: "3 tbsp"
+                        on_sale: false
+                    instructions:
+                      - "Cut chicken into bite-sized pieces"
+                      - "Mix honey, soy sauce, and garlic"
+                      - "Cook chicken until golden, add sauce"
+                    cooking_time: "30 mins"
+                    servings: 4
+                generated_at: "2025-10-04T14:35:00Z"
+        '400':
+          description: Invalid request (missing promotions or invalid preferences)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: OpenAI API error or generation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/shopping-list:
+    post:
+      summary: Create combined shopping list
+      description: Combines selected recipes into a consolidated shopping list with cost calculation
+      operationId: createShoppingList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - recipe_ids
+              properties:
+                recipe_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of recipe IDs to combine
+              example:
+                recipe_ids: ["recipe_1", "recipe_3"]
+      responses:
+        '200':
+          description: Successfully created shopping list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shopping_list:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ShoppingListItem'
+                  total_cost:
+                    type: number
+                    format: float
+                    description: Total estimated cost in dollars
+                  estimated_savings:
+                    type: number
+                    format: float
+                    description: Estimated savings from promotions in dollars
+                  created_at:
+                    type: string
+                    format: date-time
+              example:
+                shopping_list:
+                  - item: "Chicken breast"
+                    amount: "3 lb"
+                    on_sale: true
+                    price: 14.97
+                    unit_price: 4.99
+                  - item: "Honey"
+                    amount: "6 tbsp"
+                    on_sale: false
+                    price: 4.99
+                    unit_price: null
+                total_cost: 19.96
+                estimated_savings: 6.50
+                created_at: "2025-10-04T14:40:00Z"
+        '400':
+          description: Invalid recipe IDs or empty list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns API health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+              example:
+                status: "healthy"
+                timestamp: "2025-10-04T14:45:00Z"
+
+components:
+  schemas:
+    Promotion:
+      type: object
+      required:
+        - item
+        - price
+      properties:
+        item:
+          type: string
+          description: Product name
+        price:
+          type: number
+          format: float
+          description: Current price
+        unit:
+          type: string
+          description: Unit of measurement (lb, kg, ml, etc)
+        store:
+          type: string
+          description: Store name
+        discount:
+          type: string
+          description: Discount description (e.g., "30% off", "Save $2")
+        original_price:
+          type: number
+          format: float
+          description: Price before discount (optional)
+
+    Recipe:
+      type: object
+      required:
+        - id
+        - name
+        - ingredients
+        - instructions
+      properties:
+        id:
+          type: string
+          description: Unique recipe identifier
+        name:
+          type: string
+          description: Recipe name
+        description:
+          type: string
+          description: Brief recipe description
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ingredient'
+        instructions:
+          type: array
+          items:
+            type: string
+          description: Cooking steps
+        cooking_time:
+          type: string
+          description: Total cooking time (e.g., "30 mins")
+        servings:
+          type: integer
+          description: Number of servings
+
+    Ingredient:
+      type: object
+      required:
+        - item
+        - amount
+        - on_sale
+      properties:
+        item:
+          type: string
+          description: Ingredient name
+        amount:
+          type: string
+          description: Quantity needed (e.g., "1.5 lb", "3 tbsp")
+        on_sale:
+          type: boolean
+          description: Whether this item is currently on promotion
+
+    ShoppingListItem:
+      type: object
+      required:
+        - item
+        - amount
+        - on_sale
+      properties:
+        item:
+          type: string
+          description: Ingredient name
+        amount:
+          type: string
+          description: Total quantity needed across all recipes
+        on_sale:
+          type: boolean
+          description: Whether this item is currently on promotion
+        price:
+          type: number
+          format: float
+          description: Estimated total cost for this item
+        unit_price:
+          type: number
+          format: float
+          nullable: true
+          description: Price per unit (if available from promotions)
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error details (optional)
+      example:
+        error: "Scraping failed"
+        details: "Unable to connect to store website"
