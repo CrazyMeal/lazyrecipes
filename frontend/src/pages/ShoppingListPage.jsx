@@ -60,19 +60,24 @@ export default function ShoppingListPage() {
   function handleRemoveItem(indexToRemove) {
     const removedItem = currentShoppingList[indexToRemove];
     const newShoppingList = currentShoppingList.filter((_, index) => index !== indexToRemove);
-    
+
     // Recalculate total cost
     const newTotalCost = currentTotalCost - (removedItem.price || 0);
-    
+
     // Recalculate savings (only subtract if item was on sale)
-    const itemSavings = removedItem.on_sale && removedItem.price 
+    const itemSavings = removedItem.on_sale && removedItem.price
       ? removedItem.price * 0.3  // Assuming ~30% savings for on-sale items
       : 0;
     const newSavings = Math.max(0, currentSavings - itemSavings);
-    
+
     setCurrentShoppingList(newShoppingList);
     setCurrentTotalCost(newTotalCost);
     setCurrentSavings(newSavings);
+  }
+
+  // Function to handle reordering of items
+  function handleReorder(newOrderedList) {
+    setCurrentShoppingList(newOrderedList);
   }
 
   if (!shoppingListData) {
@@ -112,6 +117,7 @@ export default function ShoppingListPage() {
             totalCost={currentTotalCost}
             estimatedSavings={currentSavings}
             onRemoveItem={handleRemoveItem}
+            onReorder={handleReorder}
           />
 
           <div className="mt-6 flex gap-4">
