@@ -4,11 +4,16 @@ __pycache__/
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
 venv/
 env/
 ENV/
 
-# Environment variables
+# Environment Variables
 .env
 
 # IDE
@@ -17,6 +22,18 @@ ENV/
 *.swp
 *.swo
 
-# Playwright
+# Testing
 .pytest_cache/
-playwright-report/
+.coverage
+htmlcov/
+.tox/
+
+# Temporary Data
+flyer_images/
+promotion_results/
+test_promotions_*.json
+discovered_flyers.json
+flyer_image_urls.json
+
+# Logs
+*.log
