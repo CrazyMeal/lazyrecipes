@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import RecipeCard from '../components/RecipeCard';
-import { useScrapePromotions } from '../hooks/usePromotions';
-import { useGenerateRecipes } from '../hooks/useRecipes';
+import { useGetRecipes } from '../hooks/useRecipes';
 import { useCreateShoppingList } from '../hooks/useShoppingList';
 
 export default function Recipes() {
@@ -10,18 +9,17 @@ export default function Recipes() {
   const location = useLocation();
   const [selectedRecipes, setSelectedRecipes] = useState(new Set());
 
-  // Use query-based hooks with automatic caching
-  const promotionsQuery = useScrapePromotions('metro');
-  const recipesQuery = useGenerateRecipes(promotionsQuery.data?.promotions, 5);
+  // Fetch recipes directly - backend handles promotion scraping
+  const recipesQuery = useGetRecipes(5);
   const shoppingListMutation = useCreateShoppingList();
 
   // Reset queries if resetFlow is requested
   useEffect(() => {
     if (location.state?.resetFlow) {
-      promotionsQuery.refetch();
+      recipesQuery.refetch();
       setSelectedRecipes(new Set());
     }
-  }, [location.state?.resetFlow, promotionsQuery]);
+  }, [location.state?.resetFlow, recipesQuery]);
 
   async function createShoppingList() {
     if (selectedRecipes.size === 0) {
@@ -52,17 +50,15 @@ export default function Recipes() {
 
   function resetFlow() {
     setSelectedRecipes(new Set());
-    promotionsQuery.refetch();
+    recipesQuery.refetch();
   }
 
-  const isLoading = promotionsQuery.isLoading || recipesQuery.isLoading || shoppingListMutation.isPending;
-  const error = promotionsQuery.error || recipesQuery.error || shoppingListMutation.error;
+  const isLoading = recipesQuery.isLoading || shoppingListMutation.isPending;
+  const error = recipesQuery.error || shoppingListMutation.error;
 
-  const promotions = promotionsQuery.data?.promotions || [];
-  const store = promotionsQuery.data?.store || 'Metro';
   const recipes = recipesQuery.data?.recipes || [];
 
-  // Determine if we should show recipes (both queries succeeded)
+  // Determine if we should show recipes
   const showRecipes = !isLoading && !error && recipes.length > 0;
 
   return (
@@ -97,8 +93,7 @@ export default function Recipes() {
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary-600 mb-4"></div>
             <p className="text-lg text-gray-600">
-              {promotionsQuery.isLoading && 'Scanning grocery stores for promotions...'}
-              {recipesQuery.isLoading && 'Generating delicious recipes...'}
+              {recipesQuery.isLoading && 'Loading delicious recipes...'}
               {shoppingListMutation.isPending && 'Creating your shopping list...'}
             </p>
           </div>

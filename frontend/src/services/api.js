@@ -1,4 +1,4 @@
-import { mockPromotions, mockRecipes, mockShoppingList } from './mockData';
+import { mockRecipes, mockShoppingList } from './mockData';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
@@ -47,29 +47,15 @@ async function fetchAPI(endpoint, options = {}) {
 }
 
 export const api = {
-  async scrapePromotions(store = 'metro') {
-    if (USE_MOCK_DATA) {
-      await delay(100); // Minimal delay for smooth UI transitions
-      return mockPromotions;
-    }
-    return fetchAPI('/api/scrape', {
-      method: 'POST',
-      body: JSON.stringify({ store }),
-    });
-  },
-
-  async generateRecipes(promotions, numRecipes = 5, preferences = {}) {
+  async getRecipes(numRecipes = 5, preferences = {}) {
     if (USE_MOCK_DATA) {
       await delay(150); // Minimal delay for smooth UI transitions
       return mockRecipes;
     }
-    return fetchAPI('/api/recipes/generate', {
-      method: 'POST',
-      body: JSON.stringify({
-        promotions,
-        num_recipes: numRecipes,
-        preferences,
-      }),
+    // Backend will handle promotion scraping internally
+    return fetchAPI('/api/recipes', {
+      method: 'GET',
+      // Query params for customization
     });
   },
 
