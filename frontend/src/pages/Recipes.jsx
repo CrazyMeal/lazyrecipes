@@ -1,79 +1,48 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../services/api';
 import RecipeCard from '../components/RecipeCard';
 import PromotionsList from '../components/PromotionsList';
 import ShoppingList from '../components/ShoppingList';
+import { useScrapePromotions } from '../hooks/usePromotions';
+import { useGenerateRecipes } from '../hooks/useRecipes';
+import { useCreateShoppingList } from '../hooks/useShoppingList';
 
 export default function Recipes() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [step, setStep] = useState('initial'); // initial, promotions, recipes, shopping-list
-
-  const [promotions, setPromotions] = useState([]);
-  const [store, setStore] = useState('Metro');
-  const [recipes, setRecipes] = useState([]);
+  const [step, setStep] = useState('initial');
   const [selectedRecipes, setSelectedRecipes] = useState(new Set());
-  const [shoppingList, setShoppingList] = useState(null);
+
+  const scrapeMutation = useScrapePromotions();
+  const generateMutation = useGenerateRecipes();
+  const shoppingListMutation = useCreateShoppingList();
 
   useEffect(() => {
     startScraping();
   }, []);
 
   async function startScraping() {
-    setLoading(true);
-    setError(null);
     setStep('promotions');
 
     try {
-      const data = await api.scrapePromotions('metro');
-      setPromotions(data.promotions);
-      setStore(data.store);
-
-      await generateRecipes(data.promotions);
-    } catch (err) {
-      setError(err.message || 'Failed to scrape promotions');
-      setStep('initial');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function generateRecipes(promos) {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await api.generateRecipes(promos, 5);
-      setRecipes(data.recipes);
+      const scrapeData = await scrapeMutation.mutateAsync('metro');
+      const recipesData = await generateMutation.mutateAsync({
+        promotions: scrapeData.promotions,
+        numRecipes: 5,
+      });
       setStep('recipes');
     } catch (err) {
-      setError(err.message || 'Failed to generate recipes');
-    } finally {
-      setLoading(false);
+      setStep('initial');
     }
   }
 
   async function createShoppingList() {
     if (selectedRecipes.size === 0) {
-      setError('Please select at least one recipe');
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const recipeIds = Array.from(selectedRecipes);
-      const data = await api.createShoppingList(recipeIds);
-      setShoppingList(data);
-      setStep('shopping-list');
-    } catch (err) {
-      setError(err.message || 'Failed to create shopping list');
-    } finally {
-      setLoading(false);
-    }
+    const recipeIds = Array.from(selectedRecipes);
+    await shoppingListMutation.mutateAsync(recipeIds);
+    setStep('shopping-list');
   }
 
   function toggleRecipeSelection(recipeId) {
@@ -90,13 +59,20 @@ export default function Recipes() {
 
   function resetFlow() {
     setStep('initial');
-    setPromotions([]);
-    setRecipes([]);
     setSelectedRecipes(new Set());
-    setShoppingList(null);
-    setError(null);
+    scrapeMutation.reset();
+    generateMutation.reset();
+    shoppingListMutation.reset();
     startScraping();
   }
+
+  const isLoading = scrapeMutation.isPending || generateMutation.isPending || shoppingListMutation.isPending;
+  const error = scrapeMutation.error || generateMutation.error || shoppingListMutation.error;
+
+  const promotions = scrapeMutation.data?.promotions || [];
+  const store = scrapeMutation.data?.store || 'Metro';
+  const recipes = generateMutation.data?.recipes || [];
+  const shoppingList = shoppingListMutation.data;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -121,23 +97,23 @@ export default function Recipes() {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center gap-2 text-red-800">
               <span className="text-xl">⚠️</span>
-              <span className="font-medium">{error}</span>
+              <span className="font-medium">{error.message || 'An error occurred'}</span>
             </div>
           </div>
         )}
 
-        {loading && (
+        {isLoading && (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary-600 mb-4"></div>
             <p className="text-lg text-gray-600">
-              {step === 'promotions' && 'Scanning grocery stores for promotions...'}
-              {step === 'recipes' && 'Generating delicious recipes...'}
-              {step === 'shopping-list' && 'Creating your shopping list...'}
+              {scrapeMutation.isPending && 'Scanning grocery stores for promotions...'}
+              {generateMutation.isPending && 'Generating delicious recipes...'}
+              {shoppingListMutation.isPending && 'Creating your shopping list...'}
             </p>
           </div>
         )}
 
-        {!loading && step === 'recipes' && (
+        {!isLoading && step === 'recipes' && (
           <>
             <div className="mb-8">
               <PromotionsList promotions={promotions} store={store} />
@@ -177,7 +153,7 @@ export default function Recipes() {
           </>
         )}
 
-        {!loading && step === 'shopping-list' && shoppingList && (
+        {!isLoading && step === 'shopping-list' && shoppingList && (
           <div className="max-w-2xl mx-auto">
             <ShoppingList
               shoppingList={shoppingList.shopping_list}
