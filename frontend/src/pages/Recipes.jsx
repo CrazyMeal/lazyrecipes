@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import RecipeCard from '../components/RecipeCard';
-import PromotionsList from '../components/PromotionsList';
 import ShoppingList from '../components/ShoppingList';
 import { useScrapePromotions } from '../hooks/usePromotions';
 import { useGenerateRecipes } from '../hooks/useRecipes';
@@ -114,43 +113,37 @@ export default function Recipes() {
         )}
 
         {!isLoading && step === 'recipes' && (
-          <>
-            <div className="mb-8">
-              <PromotionsList promotions={promotions} store={store} />
-            </div>
-
-            <div className="mb-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold text-gray-900">
-                  Recipe Suggestions
-                </h2>
-                <div className="text-gray-600">
-                  {selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''} selected
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                {recipes.map(recipe => (
-                  <RecipeCard
-                    key={recipe.id}
-                    recipe={recipe}
-                    onSelect={toggleRecipeSelection}
-                    isSelected={selectedRecipes.has(recipe.id)}
-                  />
-                ))}
-              </div>
-
-              <div className="mt-8 flex justify-center">
-                <button
-                  onClick={createShoppingList}
-                  disabled={selectedRecipes.size === 0}
-                  className="btn-primary text-lg px-8 py-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Create Shopping List ({selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''})
-                </button>
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-bold text-gray-900">
+                Recipe Suggestions
+              </h2>
+              <div className="text-gray-600">
+                {selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''} selected
               </div>
             </div>
-          </>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {recipes.map(recipe => (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  onSelect={toggleRecipeSelection}
+                  isSelected={selectedRecipes.has(recipe.id)}
+                />
+              ))}
+            </div>
+
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={createShoppingList}
+                disabled={selectedRecipes.size === 0}
+                className="btn-primary text-lg px-8 py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create Shopping List ({selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''})
+              </button>
+            </div>
+          </div>
         )}
 
         {!isLoading && step === 'shopping-list' && shoppingList && (
