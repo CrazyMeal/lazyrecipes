@@ -8,10 +8,19 @@ export default function Recipes() {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedRecipes, setSelectedRecipes] = useState(new Set());
+  const [allRecipes, setAllRecipes] = useState([]);
+  const [isGeneratingMore, setIsGeneratingMore] = useState(false);
 
   // Fetch recipes directly - backend handles promotion scraping
   const recipesQuery = useGetRecipes(5);
   const shoppingListMutation = useCreateShoppingList();
+
+  // Initialize allRecipes only on first load
+  useEffect(() => {
+    if (recipesQuery.data?.recipes && allRecipes.length === 0) {
+      setAllRecipes(recipesQuery.data.recipes);
+    }
+  }, [recipesQuery.data, allRecipes.length]);
 
   // Reset queries if resetFlow is requested
   useEffect(() => {
@@ -48,15 +57,29 @@ export default function Recipes() {
     });
   }
 
+  async function generateMoreRecipes() {
+    setIsGeneratingMore(true);
+    try {
+      const newRecipesData = await recipesQuery.refetch();
+      if (newRecipesData.data?.recipes) {
+        // Prepend new recipes to the top of the list
+        setAllRecipes(prev => [...newRecipesData.data.recipes, ...prev]);
+      }
+    } finally {
+      setIsGeneratingMore(false);
+    }
+  }
+
   function resetFlow() {
     setSelectedRecipes(new Set());
+    setAllRecipes([]);
     recipesQuery.refetch();
   }
 
   const isLoading = recipesQuery.isLoading || shoppingListMutation.isPending;
   const error = recipesQuery.error || shoppingListMutation.error;
 
-  const recipes = recipesQuery.data?.recipes || [];
+  const recipes = allRecipes;
 
   // Determine if we should show recipes
   const showRecipes = !isLoading && !error && recipes.length > 0;
@@ -101,9 +124,30 @@ export default function Recipes() {
 
         {showRecipes && (
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">
-              Recipe Suggestions
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold text-gray-900">
+                Recipe Suggestions
+              </h2>
+              <button
+                onClick={generateMoreRecipes}
+                disabled={isGeneratingMore}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGeneratingMore ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Generate More Recipes</span>
+                  </>
+                )}
+              </button>
+            </div>
 
             <div className="flex gap-6">
               {/* Left Column - Recipes */}
