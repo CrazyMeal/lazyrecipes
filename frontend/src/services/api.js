@@ -1,4 +1,7 @@
+import { mockPromotions, mockRecipes, mockShoppingList } from './mockData';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 class APIError extends Error {
   constructor(message, status, details) {
@@ -8,6 +11,9 @@ class APIError extends Error {
     this.details = details;
   }
 }
+
+// Helper to simulate API delay
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function fetchAPI(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -42,6 +48,10 @@ async function fetchAPI(endpoint, options = {}) {
 
 export const api = {
   async scrapePromotions(store = 'metro') {
+    if (USE_MOCK_DATA) {
+      await delay(100); // Minimal delay for smooth UI transitions
+      return mockPromotions;
+    }
     return fetchAPI('/api/scrape', {
       method: 'POST',
       body: JSON.stringify({ store }),
@@ -49,6 +59,10 @@ export const api = {
   },
 
   async generateRecipes(promotions, numRecipes = 5, preferences = {}) {
+    if (USE_MOCK_DATA) {
+      await delay(150); // Minimal delay for smooth UI transitions
+      return mockRecipes;
+    }
     return fetchAPI('/api/recipes/generate', {
       method: 'POST',
       body: JSON.stringify({
@@ -60,6 +74,10 @@ export const api = {
   },
 
   async createShoppingList(recipeIds) {
+    if (USE_MOCK_DATA) {
+      await delay(100); // Minimal delay for smooth UI transitions
+      return mockShoppingList(recipeIds);
+    }
     return fetchAPI('/api/shopping-list', {
       method: 'POST',
       body: JSON.stringify({
@@ -69,6 +87,10 @@ export const api = {
   },
 
   async healthCheck() {
+    if (USE_MOCK_DATA) {
+      await delay(200);
+      return { status: 'healthy (mock)', timestamp: new Date().toISOString() };
+    }
     return fetchAPI('/health');
   },
 };

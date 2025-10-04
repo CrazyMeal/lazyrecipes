@@ -21,3 +21,135 @@
     @apply bg-white rounded-lg shadow-md p-6;
   }
 }
+
+/* Print styles for clean shopping list printing */
+@media print {
+  /* Hide navigation, buttons, and non-essential elements */
+  nav,
+  button,
+  .btn-primary,
+  .btn-secondary {
+    display: none !important;
+  }
+
+  /* Remove background colors and shadows for printer-friendly output */
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Prevent extra pages by removing all overflow */
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    page-break-after: avoid !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Remove page margins and optimize spacing */
+  @page {
+    margin: 0.5in;
+    size: auto;
+  }
+
+  /* Ensure shopping list items don't break across pages */
+  .shopping-list-item {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Hide drag handles in print */
+  .drag-handle {
+    display: none !important;
+  }
+
+  /* Optimize item spacing for print */
+  .space-y-3 > * + * {
+    margin-top: 0.5rem !important;
+  }
+
+  /* Make sure content fits on page */
+  .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* Prevent min-height from creating blank pages */
+  .min-h-screen {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* Clean borders and backgrounds for print */
+  .bg-gray-50,
+  .hover\:bg-gray-100 {
+    background-color: white !important;
+    border: none !important;
+  }
+
+  /* Remove all borders from rounded elements */
+  .rounded-lg {
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Ensure good contrast for printing */
+  .text-gray-700,
+  .text-gray-900 {
+    color: black !important;
+  }
+
+  /* Keep sale indicators visible */
+  .text-green-500,
+  .text-green-600,
+  .text-primary-700 {
+    color: #059669 !important;
+  }
+
+  /* Remove any extra bottom padding/margin that might cause blank page */
+  * {
+    page-break-after: auto !important;
+  }
+
+  /* Nuclear option: remove all borders and outlines in print */
+  *,
+  *::before,
+  *::after {
+    border: none !important;
+    outline: none !important;
+  }
+
+  /* Add back only the subtle borders for individual items if needed */
+  .shopping-list-item {
+    border-bottom: 1px solid #e5e7eb !important;
+    position: relative !important;
+    padding-left: 2rem !important;
+  }
+
+  .shopping-list-item:last-child {
+    border-bottom: none !important;
+  }
+
+  /* Add checkbox before each item in print */
+  .shopping-list-item::before {
+    content: "☐" !important;
+    position: absolute !important;
+    left: 0.25rem !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    font-size: 1.25rem !important;
+    color: #4b5563 !important;
+    font-weight: normal !important;
+  }
+}
