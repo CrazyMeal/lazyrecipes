@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 export default function RecipeCard({ recipe, onSelect, isSelected }) {
   return (
     <div className={`card hover:shadow-lg transition-shadow duration-200 ${
@@ -74,3 +76,21 @@ export default function RecipeCard({ recipe, onSelect, isSelected }) {
     </div>
   );
 }
+
+RecipeCard.propTypes = {
+  recipe: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    cooking_time: PropTypes.string.isRequired,
+    servings: PropTypes.number.isRequired,
+    ingredients: PropTypes.arrayOf(PropTypes.shape({
+      item: PropTypes.string.isRequired,
+      amount: PropTypes.string.isRequired,
+      on_sale: PropTypes.bool,
+    })).isRequired,
+    instructions: PropTypes.arrayOf(PropTypes.string).isRequired,
+  }).isRequired,
+  onSelect: PropTypes.func.isRequired,
+  isSelected: PropTypes.bool.isRequired,
+};

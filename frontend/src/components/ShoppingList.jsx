@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import {
   DndContext,
   closestCenter,
@@ -157,20 +158,20 @@ export default function ShoppingList({
   const promotionalItems = shoppingList.filter(item => item.is_promotion);
   const otherItems = shoppingList.filter(item => !item.is_promotion);
 
-  // Add unique IDs to items if they don't have them
-  const itemsWithIds = shoppingList.map((item, index) => ({
-    ...item,
-    id: item.id || `item-${index}`,
-  }));
+  // All items should have IDs from the API/mock data
+  // Log warning if any items are missing IDs
+  if (shoppingList.some(item => !item.id)) {
+    console.warn('Shopping list items missing IDs - this may cause drag-and-drop issues');
+  }
 
   function handleDragEnd(event) {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = itemsWithIds.findIndex((item) => item.id === active.id);
-      const newIndex = itemsWithIds.findIndex((item) => item.id === over.id);
+      const oldIndex = shoppingList.findIndex((item) => item.id === active.id);
+      const newIndex = shoppingList.findIndex((item) => item.id === over.id);
 
-      const newOrder = arrayMove(itemsWithIds, oldIndex, newIndex);
+      const newOrder = arrayMove(shoppingList, oldIndex, newIndex);
       onReorder(newOrder);
     }
   }
@@ -185,9 +186,10 @@ export default function ShoppingList({
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
+        aria-label="Reorderable shopping list items"
       >
         <SortableContext
-          items={itemsWithIds}
+          items={shoppingList}
           strategy={verticalListSortingStrategy}
         >
           {/* Promotional Items Section */}
@@ -198,15 +200,13 @@ export default function ShoppingList({
                 Items On Sale
               </h3>
               <div className="space-y-3">
-                {itemsWithIds
-                  .filter(item => item.is_promotion)
-                  .map((item) => (
-                    <SortableItem
-                      key={item.id}
-                      item={item}
-                      onRemoveItem={onRemoveItem}
-                    />
-                  ))}
+                {promotionalItems.map((item) => (
+                  <SortableItem
+                    key={item.id}
+                    item={item}
+                    onRemoveItem={onRemoveItem}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -219,15 +219,13 @@ export default function ShoppingList({
                 Other Ingredients
               </h3>
               <div className="space-y-3">
-                {itemsWithIds
-                  .filter(item => !item.is_promotion)
-                  .map((item) => (
-                    <SortableItem
-                      key={item.id}
-                      item={item}
-                      onRemoveItem={onRemoveItem}
-                    />
-                  ))}
+                {otherItems.map((item) => (
+                  <SortableItem
+                    key={item.id}
+                    item={item}
+                    onRemoveItem={onRemoveItem}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -273,3 +271,32 @@ export default function ShoppingList({
     </div>
   );
 }
+
+// PropTypes for type safety
+const shoppingListItemShape = PropTypes.shape({
+  id: PropTypes.string.isRequired,
+  item: PropTypes.string.isRequired,
+  amount: PropTypes.string,
+  price: PropTypes.number,
+  on_sale: PropTypes.bool,
+  is_promotion: PropTypes.bool,
+  store: PropTypes.string,
+  unit: PropTypes.string,
+  price_per_unit: PropTypes.number,
+  original_price: PropTypes.number,
+  discount: PropTypes.string,
+  recipes_using: PropTypes.number,
+});
+
+SortableItem.propTypes = {
+  item: shoppingListItemShape.isRequired,
+  onRemoveItem: PropTypes.func,
+};
+
+ShoppingList.propTypes = {
+  shoppingList: PropTypes.arrayOf(shoppingListItemShape).isRequired,
+  totalCost: PropTypes.number.isRequired,
+  estimatedSavings: PropTypes.number.isRequired,
+  onRemoveItem: PropTypes.func,
+  onReorder: PropTypes.func,
+};

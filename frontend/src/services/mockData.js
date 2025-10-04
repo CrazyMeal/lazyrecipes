@@ -284,7 +284,7 @@ export const mockShoppingList = (recipeIds) => {
   };
 
   // Build promotional items list (API compliant structure with extensions)
-  const promotionalItems = Array.from(promotionUsageMap.values()).map(usage => {
+  const promotionalItems = Array.from(promotionUsageMap.values()).map((usage, index) => {
     const promo = usage.promotion;
 
     // Calculate total quantity needed by summing amounts from all recipes
@@ -300,6 +300,9 @@ export const mockShoppingList = (recipeIds) => {
     const estimatedCost = promo.price * totalQuantity;
 
     return {
+      // Stable ID for React keys and drag-and-drop
+      id: `promo-${promo.item.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+
       // API compliant fields
       item: promo.item,
       amount: suggestedQtyStr,
@@ -319,7 +322,7 @@ export const mockShoppingList = (recipeIds) => {
   });
 
   // Build non-promoted items list (API compliant structure)
-  const otherItems = Array.from(nonPromotedIngredients.values()).map(item => {
+  const otherItems = Array.from(nonPromotedIngredients.values()).map((item, index) => {
     const amount = item.count > 1
       ? `${item.amounts[0]} (×${item.count})`
       : item.amounts[0];
@@ -327,6 +330,9 @@ export const mockShoppingList = (recipeIds) => {
     const estimatedPrice = 2.99 * item.count; // Default price for non-promoted items
 
     return {
+      // Stable ID for React keys and drag-and-drop
+      id: `item-${item.item.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+
       // API compliant fields
       item: item.item,
       amount: amount,

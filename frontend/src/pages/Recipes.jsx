@@ -21,7 +21,7 @@ export default function Recipes() {
       promotionsQuery.refetch();
       setSelectedRecipes(new Set());
     }
-  }, [location.state?.resetFlow]);
+  }, [location.state?.resetFlow, promotionsQuery]);
 
   async function createShoppingList() {
     if (selectedRecipes.size === 0) {
@@ -31,10 +31,8 @@ export default function Recipes() {
     const recipeIds = Array.from(selectedRecipes);
     const shoppingListData = await shoppingListMutation.mutateAsync(recipeIds);
 
-    // Clear any existing shopping list from sessionStorage before navigating
-    sessionStorage.removeItem('lazyrecipes-current-shopping-list');
-
     // Navigate to shopping list page with data
+    // Note: ShoppingListPage will handle sessionStorage initialization
     navigate('/shopping-list', {
       state: { shoppingList: shoppingListData }
     });
@@ -147,7 +145,7 @@ export default function Recipes() {
                         <div className="text-sm text-gray-600 mb-3">
                           {selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''} selected
                         </div>
-                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                        <div className="space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 24rem)' }}>
                           {recipes
                             .filter(recipe => selectedRecipes.has(recipe.id))
                             .map(recipe => (

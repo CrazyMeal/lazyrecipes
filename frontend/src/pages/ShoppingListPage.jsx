@@ -58,19 +58,15 @@ export default function ShoppingListPage() {
 
   // Function to remove an item and recalculate costs
   function handleRemoveItem(itemId) {
-    // Find the item by ID instead of index
-    const indexToRemove = currentShoppingList.findIndex(item => {
-      const id = item.id || `item-${currentShoppingList.indexOf(item)}`;
-      return id === itemId;
-    });
+    // Find the item by stable ID
+    const removedItem = currentShoppingList.find(item => item.id === itemId);
 
-    if (indexToRemove === -1) {
+    if (!removedItem) {
       console.error('Item not found:', itemId);
       return;
     }
 
-    const removedItem = currentShoppingList[indexToRemove];
-    const newShoppingList = currentShoppingList.filter((_, index) => index !== indexToRemove);
+    const newShoppingList = currentShoppingList.filter(item => item.id !== itemId);
 
     // Recalculate total cost
     const newTotalCost = Math.max(0, currentTotalCost - (removedItem.price || 0));
