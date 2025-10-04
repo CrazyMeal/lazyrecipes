@@ -16,7 +16,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 // Sortable item component with drag handle
-function SortableItem({ item, index, onRemoveItem }) {
+function SortableItem({ item, onRemoveItem }) {
   const {
     attributes,
     listeners,
@@ -105,7 +105,7 @@ function SortableItem({ item, index, onRemoveItem }) {
         )}
         {onRemoveItem && (
           <button
-            onClick={() => onRemoveItem(index)}
+            onClick={() => onRemoveItem(item.id)}
             className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors"
             title="Remove item (already have it at home)"
             aria-label={`Remove ${item.item} from shopping list`}
@@ -200,11 +200,10 @@ export default function ShoppingList({
               <div className="space-y-3">
                 {itemsWithIds
                   .filter(item => item.is_promotion)
-                  .map((item, index) => (
+                  .map((item) => (
                     <SortableItem
                       key={item.id}
                       item={item}
-                      index={shoppingList.findIndex(i => i.id === item.id)}
                       onRemoveItem={onRemoveItem}
                     />
                   ))}
@@ -222,11 +221,10 @@ export default function ShoppingList({
               <div className="space-y-3">
                 {itemsWithIds
                   .filter(item => !item.is_promotion)
-                  .map((item, index) => (
+                  .map((item) => (
                     <SortableItem
                       key={item.id}
                       item={item}
-                      index={shoppingList.findIndex(i => i.id === item.id)}
                       onRemoveItem={onRemoveItem}
                     />
                   ))}

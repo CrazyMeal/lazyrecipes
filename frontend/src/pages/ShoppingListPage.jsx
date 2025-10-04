@@ -57,17 +57,31 @@ export default function ShoppingListPage() {
   }, [shoppingListData, currentShoppingList.length, navigate]);
 
   // Function to remove an item and recalculate costs
-  function handleRemoveItem(indexToRemove) {
+  function handleRemoveItem(itemId) {
+    // Find the item by ID instead of index
+    const indexToRemove = currentShoppingList.findIndex(item => {
+      const id = item.id || `item-${currentShoppingList.indexOf(item)}`;
+      return id === itemId;
+    });
+
+    if (indexToRemove === -1) {
+      console.error('Item not found:', itemId);
+      return;
+    }
+
     const removedItem = currentShoppingList[indexToRemove];
     const newShoppingList = currentShoppingList.filter((_, index) => index !== indexToRemove);
 
     // Recalculate total cost
-    const newTotalCost = currentTotalCost - (removedItem.price || 0);
+    const newTotalCost = Math.max(0, currentTotalCost - (removedItem.price || 0));
 
-    // Recalculate savings (only subtract if item was on sale)
-    const itemSavings = removedItem.on_sale && removedItem.price
-      ? removedItem.price * 0.3  // Assuming ~30% savings for on-sale items
-      : 0;
+    // Recalculate savings based on actual promotional savings
+    let itemSavings = 0;
+    if (removedItem.is_promotion && removedItem.original_price && removedItem.price_per_unit) {
+      // Use actual savings: (original - sale) * quantity
+      const savingsPerUnit = removedItem.original_price - removedItem.price_per_unit;
+      itemSavings = savingsPerUnit * (removedItem.recipes_using || 1);
+    }
     const newSavings = Math.max(0, currentSavings - itemSavings);
 
     setCurrentShoppingList(newShoppingList);
