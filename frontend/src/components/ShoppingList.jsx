@@ -36,7 +36,7 @@ function SortableItem({ item, index, onRemoveItem }) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 p-3 bg-gray-50 rounded-lg ${
+      className={`shopping-list-item flex items-center gap-3 p-3 bg-gray-50 rounded-lg ${
         isDragging ? 'shadow-lg' : 'hover:bg-gray-100'
       } transition-colors`}
     >
@@ -44,7 +44,7 @@ function SortableItem({ item, index, onRemoveItem }) {
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 p-1"
+        className="drag-handle cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 p-1"
         aria-label="Drag to reorder"
       >
         <svg
@@ -59,17 +59,32 @@ function SortableItem({ item, index, onRemoveItem }) {
 
       {/* Item Content */}
       <div className="flex items-center gap-3 flex-1">
-        {item.on_sale && (
-          <span className="text-green-500 text-xl">💰</span>
-        )}
         <div className="flex-1">
-          <div className="font-medium text-gray-900">
-            {item.amount} {item.item}
-          </div>
-          {item.unit_price && (
-            <div className="text-sm text-gray-600">
-              ${item.unit_price.toFixed(2)} per unit
-            </div>
+          {item.is_promotion ? (
+            // Promotional item display
+            <>
+              <div className="font-medium text-gray-900">
+                {item.item}
+              </div>
+              <div className="text-sm text-gray-600">
+                ${item.price_per_unit.toFixed(2)}/{item.unit} at {item.store}
+                {item.recipes_using > 1 && (
+                  <span className="ml-2 text-primary-600">
+                    • Used in {item.recipes_using} recipes
+                  </span>
+                )}
+              </div>
+              <div className="text-sm text-gray-500">
+                Suggested: {item.amount}
+              </div>
+            </>
+          ) : (
+            // Regular ingredient display
+            <>
+              <div className="font-medium text-gray-900">
+                {item.amount} {item.item}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -81,6 +96,11 @@ function SortableItem({ item, index, onRemoveItem }) {
             item.on_sale ? 'text-primary-700' : 'text-gray-900'
           }`}>
             ${item.price.toFixed(2)}
+            {item.discount && (
+              <span className="text-sm text-green-600 ml-1">
+                ({item.discount})
+              </span>
+            )}
           </div>
         )}
         {onRemoveItem && (
@@ -133,6 +153,10 @@ export default function ShoppingList({
     );
   }
 
+  // Separate promotional items from other ingredients
+  const promotionalItems = shoppingList.filter(item => item.is_promotion);
+  const otherItems = shoppingList.filter(item => !item.is_promotion);
+
   // Add unique IDs to items if they don't have them
   const itemsWithIds = shoppingList.map((item, index) => ({
     ...item,
@@ -166,22 +190,55 @@ export default function ShoppingList({
           items={itemsWithIds}
           strategy={verticalListSortingStrategy}
         >
-          <div className="space-y-3 mb-6">
-            {itemsWithIds.map((item, index) => (
-              <SortableItem
-                key={item.id}
-                item={item}
-                index={index}
-                onRemoveItem={onRemoveItem}
-              />
-            ))}
-          </div>
+          {/* Promotional Items Section */}
+          {promotionalItems.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-primary-700 mb-3 flex items-center gap-2">
+                <span>💰</span>
+                Items On Sale
+              </h3>
+              <div className="space-y-3">
+                {itemsWithIds
+                  .filter(item => item.is_promotion)
+                  .map((item, index) => (
+                    <SortableItem
+                      key={item.id}
+                      item={item}
+                      index={shoppingList.findIndex(i => i.id === item.id)}
+                      onRemoveItem={onRemoveItem}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Other Ingredients Section */}
+          {otherItems.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <span>🛒</span>
+                Other Ingredients
+              </h3>
+              <div className="space-y-3">
+                {itemsWithIds
+                  .filter(item => !item.is_promotion)
+                  .map((item, index) => (
+                    <SortableItem
+                      key={item.id}
+                      item={item}
+                      index={shoppingList.findIndex(i => i.id === item.id)}
+                      onRemoveItem={onRemoveItem}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
         </SortableContext>
       </DndContext>
 
       <div className="border-t pt-4 space-y-2">
         <div className="flex justify-between text-lg">
-          <span className="text-gray-700">Total Cost:</span>
+          <span className="text-gray-700">Estimated Total:</span>
           <span className="font-bold text-gray-900">${totalCost.toFixed(2)}</span>
         </div>
         {estimatedSavings > 0 && (
@@ -192,7 +249,29 @@ export default function ShoppingList({
             </span>
           </div>
         )}
+        <p className="text-sm text-gray-500 italic mt-2">
+          * Actual cost may vary based on quantities purchased
+        </p>
       </div>
+
+      <button
+        onClick={() => window.print()}
+        className="btn-secondary w-full mt-4 flex items-center justify-center gap-2"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z"
+            clipRule="evenodd"
+          />
+        </svg>
+        Print Shopping List
+      </button>
     </div>
   );
 }

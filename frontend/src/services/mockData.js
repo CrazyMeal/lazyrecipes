@@ -230,61 +230,127 @@ export const mockRecipes = {
 };
 
 export const mockShoppingList = (recipeIds) => {
-  // Aggregate ingredients from selected recipes
+  // Get selected recipes
   const selectedRecipes = mockRecipes.recipes.filter(r => recipeIds.includes(r.id));
 
-  const ingredientMap = new Map();
+  // Track which promotional items are used and in how many recipes
+  const promotionUsageMap = new Map();
+  const nonPromotedIngredients = new Map();
 
   selectedRecipes.forEach(recipe => {
     recipe.ingredients.forEach(ingredient => {
-      const key = ingredient.item;
-      if (ingredientMap.has(key)) {
-        const existing = ingredientMap.get(key);
-        // Simple aggregation (in real implementation, would parse amounts properly)
-        existing.count += 1;
+      const key = ingredient.item.toLowerCase();
+
+      // Check if this ingredient has a matching promotion
+      const promotion = mockPromotions.promotions.find(
+        p => p.item.toLowerCase() === key
+      );
+
+      if (promotion && ingredient.on_sale) {
+        // Track promotional item usage
+        if (promotionUsageMap.has(key)) {
+          const existing = promotionUsageMap.get(key);
+          existing.recipes_using += 1;
+          existing.recipe_amounts.push(ingredient.amount);
+        } else {
+          promotionUsageMap.set(key, {
+            promotion: promotion,
+            recipes_using: 1,
+            recipe_amounts: [ingredient.amount]
+          });
+        }
       } else {
-        ingredientMap.set(key, {
-          item: ingredient.item,
-          amount: ingredient.amount,
-          on_sale: ingredient.on_sale,
-          count: 1
-        });
+        // Track non-promoted ingredient
+        if (nonPromotedIngredients.has(key)) {
+          const existing = nonPromotedIngredients.get(key);
+          existing.count += 1;
+          existing.amounts.push(ingredient.amount);
+        } else {
+          nonPromotedIngredients.set(key, {
+            item: ingredient.item,
+            count: 1,
+            amounts: [ingredient.amount]
+          });
+        }
       }
     });
   });
 
-  const shoppingList = Array.from(ingredientMap.values()).map(item => {
-    // Find matching promotion to get price
-    const promotion = mockPromotions.promotions.find(
-      p => p.item.toLowerCase() === item.item.toLowerCase()
-    );
+  // Helper function to parse amount strings and extract numeric values
+  const parseAmount = (amountStr) => {
+    // Extract first number from strings like "1.5 lb", "3 tbsp", "2 medium", etc.
+    const match = amountStr.match(/(\d+\.?\d*)/);
+    return match ? parseFloat(match[1]) : 1; // Default to 1 if can't parse
+  };
 
-    const unitPrice = promotion?.price || 2.99;
-    const price = unitPrice * item.count;
+  // Build promotional items list (API compliant structure with extensions)
+  const promotionalItems = Array.from(promotionUsageMap.values()).map(usage => {
+    const promo = usage.promotion;
+
+    // Calculate total quantity needed by summing amounts from all recipes
+    const totalQuantity = usage.recipe_amounts.reduce((sum, amountStr) => {
+      return sum + parseAmount(amountStr);
+    }, 0);
+
+    // Round up to nearest whole number for practical shopping
+    const suggestedQty = Math.ceil(totalQuantity);
+    const suggestedQtyStr = `~${suggestedQty} ${promo.unit}`;
+
+    // Calculate estimated cost based on actual quantity needed
+    const estimatedCost = promo.price * totalQuantity;
 
     return {
-      item: item.item,
-      amount: item.count > 1 ? `${item.amount} (×${item.count})` : item.amount,
-      on_sale: item.on_sale,
-      price: parseFloat(price.toFixed(2)),
-      unit_price: promotion ? unitPrice : null
+      // API compliant fields
+      item: promo.item,
+      amount: suggestedQtyStr,
+      on_sale: true,
+      price: parseFloat(estimatedCost.toFixed(2)),
+
+      // Extended fields for better UX
+      store: promo.store,
+      unit: promo.unit,
+      price_per_unit: promo.price,
+      original_price: promo.original_price,
+      discount: promo.discount,
+      recipes_using: usage.recipes_using,
+      total_quantity_needed: totalQuantity, // Exact amount for reference
+      is_promotion: true
     };
   });
 
-  const totalCost = shoppingList.reduce((sum, item) => sum + item.price, 0);
-  const savingsPerItem = shoppingList
-    .filter(item => item.on_sale && item.unit_price)
-    .map(item => {
-      const promotion = mockPromotions.promotions.find(
-        p => p.item.toLowerCase() === item.item.toLowerCase()
-      );
-      if (promotion?.original_price) {
-        return (promotion.original_price - promotion.price) * item.price / promotion.price;
-      }
-      return 0;
-    });
+  // Build non-promoted items list (API compliant structure)
+  const otherItems = Array.from(nonPromotedIngredients.values()).map(item => {
+    const amount = item.count > 1
+      ? `${item.amounts[0]} (×${item.count})`
+      : item.amounts[0];
 
-  const estimatedSavings = savingsPerItem.reduce((sum, saving) => sum + saving, 0);
+    const estimatedPrice = 2.99 * item.count; // Default price for non-promoted items
+
+    return {
+      // API compliant fields
+      item: item.item,
+      amount: amount,
+      on_sale: false,
+      price: parseFloat(estimatedPrice.toFixed(2)),
+
+      // Extended field
+      is_promotion: false
+    };
+  });
+
+  // Combine both lists (promotional items first)
+  const shoppingList = [...promotionalItems, ...otherItems];
+
+  // Calculate totals (API compliant)
+  const totalCost = shoppingList.reduce((sum, item) => sum + item.price, 0);
+
+  const estimatedSavings = promotionalItems.reduce((sum, item) => {
+    if (item.original_price && item.price_per_unit) {
+      const savingsPerUnit = item.original_price - item.price_per_unit;
+      return sum + (savingsPerUnit * item.recipes_using);
+    }
+    return sum;
+  }, 0);
 
   return {
     shopping_list: shoppingList,
